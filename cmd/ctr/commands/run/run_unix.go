@@ -113,6 +113,10 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 			Path: parts[1],
 		}))
 	}
+	if context.Bool("rootless") {
+		// needs to be the last
+		opts = append(opts, oci.WithRootless)
+	}
 	if context.IsSet("config") {
 		var s specs.Spec
 		if err := loadSpec(context.String("config"), &s); err != nil {
@@ -124,10 +128,6 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 	}
 	cOpts = append(cOpts, spec)
 
-	if context.Bool("rootless") {
-		// needs to be the last
-		opts = append(opts, oci.WithRootless)
-	}
 	// oci.WithImageConfig (WithUsername, WithUserID) depends on rootfs snapshot for resolving /etc/passwd.
 	// So cOpts needs to have precedence over opts.
 	// TODO: WithUsername, WithUserID should additionally support non-snapshot rootfs
