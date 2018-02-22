@@ -39,7 +39,6 @@ import (
 	"github.com/containerd/containerd/linux/shim"
 	shimapi "github.com/containerd/containerd/linux/shim/v1"
 	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/sys"
 	ptypes "github.com/gogo/protobuf/types"
 )
 
@@ -93,9 +92,9 @@ func WithStart(binary, address, daemonAddress, cgroup string, debug bool, exitHa
 				"address": address,
 			}).Infof("shim placed in cgroup %s", cgroup)
 		}
-		if err = sys.SetOOMScore(cmd.Process.Pid, sys.OOMScoreMaxKillable); err != nil {
-			return nil, nil, errors.Wrap(err, "failed to set OOM Score on shim")
-		}
+		// if err = sys.SetOOMScore(cmd.Process.Pid, sys.OOMScoreMaxKillable); err != nil {
+		// 	return nil, nil, errors.Wrap(err, "failed to set OOM Score on shim")
+		// }
 		c, clo, err := WithConnect(address, func() {})(ctx, config)
 		if err != nil {
 			return nil, nil, errors.Wrap(err, "failed to connect")
