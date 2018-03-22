@@ -24,6 +24,7 @@ import (
 	"strconv"
 
 	"github.com/opencontainers/runc/libcontainer/system"
+	"golang.org/x/sys/unix"
 )
 
 // OOMScoreMaxKillable is the maximum score keeping the process killable by the oom killer
@@ -38,10 +39,14 @@ func SetOOMScore(pid, score int) error {
 	}
 	defer f.Close()
 	if _, err = f.WriteString(strconv.Itoa(score)); err != nil {
-		if os.IsPermission(err) && system.RunningInUserNS() {
+		if os.IsPermission(err) && (system.RunningInUserNS() || runningUnpriviledged()) {
 			return nil
 		}
 		return err
 	}
 	return nil
+}
+
+func runningUnpriviledged() bool {
+	return unix.Geteuid() != 0
 }

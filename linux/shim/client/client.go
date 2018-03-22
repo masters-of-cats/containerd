@@ -93,6 +93,7 @@ func WithStart(binary, address, daemonAddress, cgroup string, debug bool, exitHa
 				"address": address,
 			}).Infof("shim placed in cgroup %s", cgroup)
 		}
+		// TODO: PR opportunity! We cannot set OOM score as we don't have permission to access /proc/PID/oom_score
 		if err = sys.SetOOMScore(cmd.Process.Pid, sys.OOMScoreMaxKillable); err != nil {
 			return nil, nil, errors.Wrap(err, "failed to set OOM Score on shim")
 		}

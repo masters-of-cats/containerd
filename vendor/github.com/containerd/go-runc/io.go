@@ -17,6 +17,7 @@
 package runc
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -54,7 +55,7 @@ func NewPipeIO(uid, gid int) (i IO, err error) {
 	}
 	pipes = append(pipes, stdin)
 	if err = unix.Fchown(int(stdin.r.Fd()), uid, gid); err != nil {
-		return nil, errors.Wrap(err, "failed to chown stdin")
+		return nil, errors.Wrap(err, fmt.Sprintf("failed to chown stdin --- stdin.r.Fd() = %d, uid = %d, gid = %d, runningas = %d:%d\n", stdin.r.Fd(), uid, gid, os.Geteuid(), os.Getegid()))
 	}
 
 	stdout, err := newPipe()
