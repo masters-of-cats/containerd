@@ -40,6 +40,7 @@ import (
 	google_protobuf "github.com/gogo/protobuf/types"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
+	"golang.org/x/sys/unix"
 )
 
 // InitPidFile name of the file that contains the init pid
@@ -311,7 +312,7 @@ func (p *Init) delete(context context.Context) error {
 		}
 		p.io.Close()
 	}
-	if err2 := mount.UnmountAll(p.rootfs, 0); err2 != nil {
+	if err2 := mount.UnmountAll(p.rootfs, 0); err2 != nil && err2 != unix.EPERM {
 		log.G(context).WithError(err2).Warn("failed to cleanup rootfs mount")
 		if err == nil {
 			err = errors.Wrap(err2, "failed rootfs umount")

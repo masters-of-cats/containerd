@@ -94,6 +94,12 @@ func UnmountAll(mount string, flags int) error {
 			// done. It can also indicate a few other
 			// things (such as invalid flags) which we
 			// unfortunately end up squelching here too.
+			// EPERM is returned if we do not have privilege
+			// to unmount the target. This can happen if we are
+			// running as an unprivileged user. Typically, this
+			// would mean the rootfs mount is in the container's
+			// mount namespace, which will get unmounted automatically
+			// by the kernel when the pid namespace goes away.
 			if err == unix.EINVAL {
 				return nil
 			}
