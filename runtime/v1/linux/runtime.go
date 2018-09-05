@@ -21,6 +21,7 @@ package linux
 import (
 	"context"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -340,6 +341,30 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 			}
 			continue
 		}
+
+		stdoutPipePath := filepath.Join(r.root, ns, id, "shim.stdout")
+		stdoutR, err := os.OpenFile(stdoutPipePath, os.O_RDONLY, 0600)
+		if err != nil {
+			log.G(ctx).WithError(err).WithFields(logrus.Fields{
+				"id":             id,
+				"namespace":      ns,
+				"stdoutPipePath": stdoutPipePath,
+			}).Error("connecting to stdout shim pipe")
+			continue
+		}
+		go io.Copy(os.Stdout, stdoutR)
+
+		stderrPipePath := filepath.Join(r.root, ns, id, "shim.stderr")
+		stderrR, err := os.OpenFile(stderrPipePath, os.O_RDONLY, 0600)
+		if err != nil {
+			log.G(ctx).WithError(err).WithFields(logrus.Fields{
+				"id":             id,
+				"namespace":      ns,
+				"stderrPipePath": stderrPipePath,
+			}).Error("connecting to stderr shim pipe")
+			continue
+		}
+		go io.Copy(os.Stderr, stderrR)
 
 		t, err := newTask(id, ns, pid, s, r.events, r.tasks, bundle)
 		if err != nil {

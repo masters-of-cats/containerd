@@ -23,10 +23,12 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"runtime/debug"
 	"strings"
@@ -92,10 +94,39 @@ func main() {
 		runtime.GOMAXPROCS(2)
 	}
 
+	stdout, stderr, err := openStdioKeepAlivePipes(workdirFlag)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "containerd-shim: %s\n", err)
+		os.Exit(1)
+	}
+	defer func() {
+		stdout.Close()
+		stderr.Close()
+	}()
+
 	if err := executeShim(); err != nil {
 		fmt.Fprintf(os.Stderr, "containerd-shim: %s\n", err)
 		os.Exit(1)
 	}
+}
+
+// If containerd server process dies, we need the shim to keep stdout/err reader
+// FDs so that Linux does not SIGPIPE the shim process if it tries to use its end of
+// these pipes.
+func openStdioKeepAlivePipes(dir string) (io.ReadCloser, io.ReadCloser, error) {
+	keepStdoutAlive, err := openFile(filepath.Join(dir, "shim.stdout"), os.O_RDONLY)
+	if err != nil {
+		return nil, nil, err
+	}
+	keepStderrAlive, err := openFile(filepath.Join(dir, "shim.stderr"), os.O_RDONLY)
+	if err != nil {
+		return nil, nil, err
+	}
+	return keepStdoutAlive, keepStderrAlive, nil
+}
+
+func openFile(path string, flags int) (*os.File, error) {
+	return os.OpenFile(path, flags, 0600)
 }
 
 func executeShim() error {

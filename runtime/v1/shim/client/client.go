@@ -24,6 +24,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
@@ -62,7 +63,24 @@ func WithStart(binary, address, daemonAddress, cgroup string, debug bool, exitHa
 		}
 		defer f.Close()
 
-		cmd, err := newCommand(binary, daemonAddress, debug, config, f)
+		stdoutR, stdoutW, err := createStdioPipe(filepath.Join(config.WorkDir, "shim.stdout"), debug)
+		if err != nil {
+			return nil, nil, errors.Wrapf(err, "failed to create stdout pipe")
+		}
+
+		stderrR, stderrW, err := createStdioPipe(filepath.Join(config.WorkDir, "shim.stderr"), debug)
+		if err != nil {
+			return nil, nil, errors.Wrapf(err, "failed to create stderr pipe")
+		}
+
+		if stdoutR != nil {
+			go io.Copy(os.Stdout, stdoutR)
+		}
+		if stderrR != nil {
+			go io.Copy(os.Stderr, stderrR)
+		}
+
+		cmd, err := newCommand(binary, daemonAddress, debug, config, f, stdoutW, stderrW)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -77,6 +95,8 @@ func WithStart(binary, address, daemonAddress, cgroup string, debug bool, exitHa
 		go func() {
 			cmd.Wait()
 			exitHandler()
+			stdoutW.Close()
+			stderrW.Close()
 		}()
 		log.G(ctx).WithFields(logrus.Fields{
 			"pid":     cmd.Process.Pid,
@@ -104,7 +124,40 @@ func WithStart(binary, address, daemonAddress, cgroup string, debug bool, exitHa
 	}
 }
 
-func newCommand(binary, daemonAddress string, debug bool, config shim.Config, socket *os.File) (*exec.Cmd, error) {
+func createStdioPipe(path string, debug bool) (io.Reader, io.WriteCloser, error) {
+	if !debug {
+		return nil, nil, nil
+	}
+
+	if err := unix.Mkfifo(path, 0600); err != nil {
+		return nil, nil, errors.Wrapf(err, "failed to create fifo %s", path)
+	}
+
+	reader, err := openNonBlocking(path)
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "failed to open read end of fifo %s", path)
+	}
+
+	writer, err := os.OpenFile(path, os.O_WRONLY, 0600)
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "failed to open write end of fifo %s", path)
+	}
+
+	return reader, writer, nil
+}
+
+func openNonBlocking(fileName string) (*os.File, error) {
+	file, err := os.OpenFile(fileName, os.O_RDONLY|syscall.O_NONBLOCK, 0600)
+	if err != nil {
+		return nil, err
+	}
+	if err = syscall.SetNonblock(int(file.Fd()), false); err != nil {
+		return nil, err
+	}
+	return file, nil
+}
+
+func newCommand(binary, daemonAddress string, debug bool, config shim.Config, socket *os.File, stdout, stderr io.Writer) (*exec.Cmd, error) {
 	selfExe, err := os.Executable()
 	if err != nil {
 		return nil, err
@@ -137,10 +190,8 @@ func newCommand(binary, daemonAddress string, debug bool, config shim.Config, so
 	cmd.SysProcAttr = getSysProcAttr()
 	cmd.ExtraFiles = append(cmd.ExtraFiles, socket)
 	cmd.Env = append(os.Environ(), "GOMAXPROCS=2")
-	if debug {
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-	}
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
 	return cmd, nil
 }
 

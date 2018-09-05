@@ -24,7 +24,9 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -256,6 +258,184 @@ func TestDaemonRestart(t *testing.T) {
 	}
 
 	<-statusC
+}
+
+func TestShimDoesNotLeakPipes(t *testing.T) {
+	containerdPid := ctrd.cmd.Process.Pid
+	initialPipes, err := numPipes(containerdPid)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext()
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "30")), WithNewSnapshot(id, image))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	exitChannel, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+		t.Fatal(err)
+	}
+
+	<-exitChannel
+
+	if _, err := task.Delete(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := container.Delete(ctx, WithSnapshotCleanup); err != nil {
+		t.Fatal(err)
+	}
+
+	currentPipes, err := numPipes(containerdPid)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if initialPipes != currentPipes {
+		t.Errorf("Pipes have leaked after container has been deleted. Initially there were %d pipes, after container deletion there were %d pipes", initialPipes, currentPipes)
+	}
+}
+
+func numPipes(pid int) (int, error) {
+	cmd := exec.Command("sh", "-c", fmt.Sprintf("lsof -p %d | grep pipe", pid))
+
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+	if err := cmd.Run(); err != nil {
+		return 0, err
+	}
+	return strings.Count(stdout.String(), "\n"), nil
+}
+
+func TestDaemonReconnectsToShimIOPipesOnRestart(t *testing.T) {
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext()
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "30")), WithNewSnapshot(id, image))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer task.Delete(ctx)
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := ctrd.Restart(nil); err != nil {
+		t.Fatal(err)
+	}
+
+	waitCtx, waitCancel := context.WithTimeout(ctx, 2*time.Second)
+	serving, err := client.IsServing(waitCtx)
+	waitCancel()
+	if !serving {
+		t.Fatalf("containerd did not start within 2s: %v", err)
+	}
+
+	pipesPath := filepath.Join(defaultRoot, "io.containerd.runtime.v1.linux", testNamespace, "TestDaemonReconnectsToShimIOPipesOnRestart")
+	stdoutW, err := os.OpenFile(filepath.Join(pipesPath, "shim.stdout"), os.O_WRONLY, 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := stdoutW.WriteString("TestDaemonReconnectsToShimIOPipes writing to stdout"); err != nil {
+		t.Fatal(err)
+	}
+	if err := stdoutW.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	stderrW, err := os.OpenFile(filepath.Join(pipesPath, "shim.stderr"), os.O_WRONLY, 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := stderrW.WriteString("TestDaemonReconnectsToShimIOPipes writing to stderr"); err != nil {
+		t.Fatal(err)
+	}
+	if err := stderrW.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	statusC, err = task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+		t.Fatal(err)
+	}
+
+	<-statusC
+
+	stdioContents, err := ioutil.ReadFile(ctrdStdioFilePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(string(stdioContents), "TestDaemonReconnectsToShimIOPipes writing to stdout") {
+		t.Fatal("containerd did not connect to the shim stdout pipe")
+	}
+
+	if !strings.Contains(string(stdioContents), "TestDaemonReconnectsToShimIOPipes writing to stderr") {
+		t.Fatal("containerd did not connect to the shim stderr pipe")
+	}
 }
 
 func TestContainerPTY(t *testing.T) {
