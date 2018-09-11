@@ -72,7 +72,7 @@ containerd CLI
 		cli.StringFlag{
 			Name:  "address, a",
 			Usage: "address for containerd's GRPC server",
-			Value: defaults.DefaultAddress,
+			Value: defaults.UserAddress,
 		},
 		cli.DurationFlag{
 			Name:  "timeout",

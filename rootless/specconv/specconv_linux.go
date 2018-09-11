@@ -18,6 +18,7 @@
 package specconv
 
 import (
+	"errors"
 	"os"
 	"sort"
 	"strings"
@@ -25,7 +26,6 @@ import (
 	"github.com/opencontainers/runc/libcontainer/system"
 	"github.com/opencontainers/runc/libcontainer/user"
 	"github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
 )
 
 // ToRootless converts spec to be compatible with "rootless" runc.

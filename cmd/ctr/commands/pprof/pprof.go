@@ -41,7 +41,7 @@ var Command = cli.Command{
 		cli.StringFlag{
 			Name:  "debug-socket, d",
 			Usage: "socket path for containerd's debug server",
-			Value: defaults.DefaultDebugAddress,
+			Value: defaults.UserDebugAddress,
 		},
 	},
 	Subcommands: []cli.Command{

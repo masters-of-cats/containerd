@@ -30,6 +30,8 @@ import (
 	"syscall"
 	"time"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
@@ -312,7 +314,10 @@ func (p *Init) delete(context context.Context) error {
 		}
 		p.io.Close()
 	}
-	if err2 := mount.UnmountAll(p.rootfs, 0); err2 != nil {
+	// Note: We PRed this a while back but it seems to have vanished...
+	// We don't have power to umount when rootless, but the mount should go away when
+	// the namespace does so we can ignore this.
+	if err2 := mount.UnmountAll(p.rootfs, 0); err2 != nil && err2 != unix.EPERM {
 		log.G(context).WithError(err2).Warn("failed to cleanup rootfs mount")
 		if err == nil {
 			err = errors.Wrap(err2, "failed rootfs umount")

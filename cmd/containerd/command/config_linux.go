@@ -18,24 +18,25 @@ package command
 
 import (
 	"github.com/containerd/containerd/defaults"
-	"github.com/containerd/containerd/rootless"
 	"github.com/containerd/containerd/services/server"
 )
 
+// Note: We weren't sure of the reason for having separate Default and User config things
+// and then setting them to the same thing in defaults/defaults.go
+// We have done this for now but there is probably no need for the User* ones
+// You will see that we have switched all calls of defaults.Default* to defaults.User*
 func defaultConfig() *server.Config {
 	c := &server.Config{
-		Root:  defaults.DefaultRootDir,
-		State: defaults.DefaultStateDir,
+		Root:  defaults.UserRootDir,
+		State: defaults.UserStateDir,
+		Debug: server.Debug{
+			Address: defaults.UserDebugAddress,
+		},
 		GRPC: server.GRPCConfig{
-			Address:        defaults.DefaultAddress,
+			Address:        defaults.UserAddress,
 			MaxRecvMsgSize: defaults.DefaultMaxRecvMsgSize,
 			MaxSendMsgSize: defaults.DefaultMaxSendMsgSize,
 		},
-	}
-	if rootless.RunningWithNonRootUsername {
-		c.Root = defaults.UserRootDir
-		c.State = defaults.UserStateDir
-		c.GRPC.Address = defaults.UserAddress
 	}
 	return c
 }

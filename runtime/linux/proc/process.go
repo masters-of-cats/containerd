@@ -22,16 +22,13 @@ import (
 	"path/filepath"
 
 	"github.com/containerd/containerd/defaults"
-	"github.com/containerd/containerd/rootless"
 	"github.com/pkg/errors"
 )
 
 // RuncRoot is the path to the root runc state directory
+// Note: UserStateDir is set to DefaultStateDir unless overridden by XDG_RUNTIME_DIR
 func RuncRoot() string {
-	if rootless.RunningWithNonRootUsername {
-		return filepath.Join(defaults.UserStateDir, "runc")
-	}
-	return filepath.Join(defaults.DefaultStateDir, "runc")
+	return filepath.Join(defaults.UserStateDir, "runc")
 }
 
 func stateName(v interface{}) string {

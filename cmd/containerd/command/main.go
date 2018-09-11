@@ -24,7 +24,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
@@ -94,9 +93,7 @@ func App() *cli.App {
 		ociHook,
 	}
 	app.Action = func(context *cli.Context) error {
-		if runtime.GOOS == "linux" && os.Geteuid() != 0 {
-			return errors.New("rootless mode requires the daemon to be executed as the mapped root in a user namespace")
-		}
+		// Note: We do not need to run in userns and do not need to enforce this
 		var (
 			start   = time.Now()
 			signals = make(chan os.Signal, 2048)
@@ -113,6 +110,7 @@ func App() *cli.App {
 		if err := server.LoadConfig(context.GlobalString("config"), config); err != nil && !os.IsNotExist(err) {
 			return err
 		}
+
 		// apply flags to the config
 		if err := applyFlags(context, config); err != nil {
 			return err

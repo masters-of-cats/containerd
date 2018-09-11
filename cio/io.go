@@ -136,8 +136,9 @@ func NewCreator(opts ...Opt) Creator {
 	for _, opt := range opts {
 		opt(streams)
 	}
+	// Note: Ensure this dir created somewhere user has perms
 	if streams.FIFODir == "" {
-		streams.FIFODir = defaults.DefaultFIFODir
+		streams.FIFODir = defaults.UserFIFODir
 	}
 	return func(id string) (IO, error) {
 		fifos, err := NewFIFOSetInDir(streams.FIFODir, id, streams.Terminal)

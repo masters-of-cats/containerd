@@ -25,6 +25,8 @@ import (
 
 // WithRootless applies github.com/containerd/containerd/rootless/specconv.ToRootless().
 // WithRootless needs to be called in the daemon's user namespace.
+
+// Note: Garden does not need to use this in our client as we are not running with user ns
 func WithRootless() SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		return specconv.ToRootless(s)

@@ -224,16 +224,8 @@ func incrementFS(root string, uidInc, gidInc uint32) filepath.WalkFunc {
 
 // WithNoPivotRoot instructs the runtime not to you pivot_root
 func WithNoPivotRoot(_ context.Context, _ *Client, info *TaskInfo) error {
-	if info.Options == nil {
-		info.Options = &runctypes.CreateOptions{
-			NoPivotRoot: true,
-		}
+	return updateTaskInfoCreateOptions(info, func(opts *runctypes.CreateOptions) error {
+		opts.NoPivotRoot = true
 		return nil
-	}
-	copts, ok := info.Options.(*runctypes.CreateOptions)
-	if !ok {
-		return errors.New("invalid options type, expected runctypes.CreateOptions")
-	}
-	copts.NoPivotRoot = true
-	return nil
+	})
 }
