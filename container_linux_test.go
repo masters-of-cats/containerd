@@ -285,7 +285,7 @@ func TestShimDoesNotLeakPipes(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "30")), WithNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "30")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -358,7 +358,7 @@ func TestDaemonReconnectsToShimIOPipesOnRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "30")), WithNewSnapshot(id, image))
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "30")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -391,7 +391,7 @@ func TestDaemonReconnectsToShimIOPipesOnRestart(t *testing.T) {
 	}
 
 	pipesPath := filepath.Join(defaultRoot, "io.containerd.runtime.v1.linux", testNamespace, "TestDaemonReconnectsToShimIOPipesOnRestart")
-	stdoutW, err := os.OpenFile(filepath.Join(pipesPath, "shim.stdout"), os.O_WRONLY, 0600)
+	stdoutW, err := os.OpenFile(filepath.Join(pipesPath, "stdout.log"), os.O_WRONLY, 0600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -402,7 +402,7 @@ func TestDaemonReconnectsToShimIOPipesOnRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	stderrW, err := os.OpenFile(filepath.Join(pipesPath, "shim.stderr"), os.O_WRONLY, 0600)
+	stderrW, err := os.OpenFile(filepath.Join(pipesPath, "stderr.log"), os.O_WRONLY, 0600)
 	if err != nil {
 		t.Fatal(err)
 	}

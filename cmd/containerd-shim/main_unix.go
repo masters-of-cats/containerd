@@ -28,7 +28,6 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	"path/filepath"
 	"runtime"
 	"runtime/debug"
 	"strings"
@@ -38,6 +37,7 @@ import (
 
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/namespaces"
+	shimlog "github.com/containerd/containerd/runtime/v1"
 	"github.com/containerd/containerd/runtime/v1/linux/proc"
 	"github.com/containerd/containerd/runtime/v1/shim"
 	shimapi "github.com/containerd/containerd/runtime/v1/shim/v1"
@@ -114,11 +114,12 @@ func main() {
 // FDs so that Linux does not SIGPIPE the shim process if it tries to use its end of
 // these pipes.
 func openStdioKeepAlivePipes(dir string) (io.ReadCloser, io.ReadCloser, error) {
-	keepStdoutAlive, err := openFile(filepath.Join(dir, "shim.stdout"), os.O_RDONLY)
+	background := context.Background()
+	keepStdoutAlive, err := shimlog.OpenShimStdoutLog(background, dir)
 	if err != nil {
 		return nil, nil, err
 	}
-	keepStderrAlive, err := openFile(filepath.Join(dir, "shim.stderr"), os.O_RDONLY)
+	keepStderrAlive, err := shimlog.OpenShimStderrLog(background, dir)
 	if err != nil {
 		return nil, nil, err
 	}

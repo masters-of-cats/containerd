@@ -41,6 +41,7 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
+	"github.com/containerd/containerd/runtime/v1"
 	"github.com/containerd/containerd/runtime/v1/linux/proc"
 	shim "github.com/containerd/containerd/runtime/v1/shim/v1"
 	runc "github.com/containerd/go-runc"
@@ -342,29 +343,29 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 			continue
 		}
 
-		stdoutPipePath := filepath.Join(r.root, ns, id, "shim.stdout")
-		stdoutR, err := os.OpenFile(stdoutPipePath, os.O_RDONLY, 0600)
-		if err != nil {
-			log.G(ctx).WithError(err).WithFields(logrus.Fields{
-				"id":             id,
-				"namespace":      ns,
-				"stdoutPipePath": stdoutPipePath,
-			}).Error("connecting to stdout shim pipe")
-			continue
-		}
-		go io.Copy(os.Stdout, stdoutR)
+		logDirPath := filepath.Join(r.root, ns, id)
 
-		stderrPipePath := filepath.Join(r.root, ns, id, "shim.stderr")
-		stderrR, err := os.OpenFile(stderrPipePath, os.O_RDONLY, 0600)
+		shimStdoutLog, err := v1.OpenShimStdoutLog(ctx, logDirPath)
 		if err != nil {
 			log.G(ctx).WithError(err).WithFields(logrus.Fields{
-				"id":             id,
-				"namespace":      ns,
-				"stderrPipePath": stderrPipePath,
-			}).Error("connecting to stderr shim pipe")
+				"id":         id,
+				"namespace":  ns,
+				"logDirPath": logDirPath,
+			}).Error("opening shim stdout log pipe")
 			continue
 		}
-		go io.Copy(os.Stderr, stderrR)
+		go io.Copy(os.Stdout, shimStdoutLog)
+
+		shimStderrLog, err := v1.OpenShimStderrLog(ctx, logDirPath)
+		if err != nil {
+			log.G(ctx).WithError(err).WithFields(logrus.Fields{
+				"id":         id,
+				"namespace":  ns,
+				"logDirPath": logDirPath,
+			}).Error("opening shim stderr log pipe")
+			continue
+		}
+		go io.Copy(os.Stderr, shimStderrLog)
 
 		t, err := newTask(id, ns, pid, s, r.events, r.tasks, bundle)
 		if err != nil {
