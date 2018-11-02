@@ -390,27 +390,17 @@ func TestDaemonReconnectsToShimIOPipesOnRestart(t *testing.T) {
 		t.Fatalf("containerd did not start within 2s: %v", err)
 	}
 
-	pipesPath := filepath.Join(defaultRoot, "io.containerd.runtime.v1.linux", testNamespace, "TestDaemonReconnectsToShimIOPipesOnRestart")
-	stdoutW, err := os.OpenFile(filepath.Join(pipesPath, "stdout.log"), os.O_WRONLY, 0600)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := stdoutW.WriteString("TestDaemonReconnectsToShimIOPipes writing to stdout"); err != nil {
-		t.Fatal(err)
-	}
-	if err := stdoutW.Close(); err != nil {
-		t.Fatal(err)
-	}
+	// After we restared containerd we write some messages to the log pipes, simulating shim writing stuff there.
+	// Then we make sure that these messages are available on the containerd log thus proving that the server reconnected to the log pipes
+	runtimeVersion := getRuntimeVersion()
+	logDirPath := getLogDirPath(runtimeVersion, "TestDaemonReconnectsToShimIOPipesOnRestart")
 
-	stderrW, err := os.OpenFile(filepath.Join(pipesPath, "stderr.log"), os.O_WRONLY, 0600)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := stderrW.WriteString("TestDaemonReconnectsToShimIOPipes writing to stderr"); err != nil {
-		t.Fatal(err)
-	}
-	if err := stderrW.Close(); err != nil {
-		t.Fatal(err)
+	switch runtimeVersion {
+	case "v1":
+		writeToFile(t, filepath.Join(logDirPath, "shim.stdout.log"), "TestDaemonReconnectsToShimIOPipes writing to stdout\n")
+		writeToFile(t, filepath.Join(logDirPath, "shim.stderr.log"), "TestDaemonReconnectsToShimIOPipes writing to stderr\n")
+	case "v2":
+		writeToFile(t, filepath.Join(logDirPath, "log"), "TestDaemonReconnectsToShimIOPipes writing to log\n")
 	}
 
 	statusC, err = task.Wait(ctx)
@@ -429,12 +419,51 @@ func TestDaemonReconnectsToShimIOPipesOnRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !strings.Contains(string(stdioContents), "TestDaemonReconnectsToShimIOPipes writing to stdout") {
-		t.Fatal("containerd did not connect to the shim stdout pipe")
+	switch runtimeVersion {
+	case "v1":
+		if !strings.Contains(string(stdioContents), "TestDaemonReconnectsToShimIOPipes writing to stdout") {
+			t.Fatal("containerd did not connect to the shim stdout pipe")
+		}
+		if !strings.Contains(string(stdioContents), "TestDaemonReconnectsToShimIOPipes writing to stderr") {
+			t.Fatal("containerd did not connect to the shim stderr pipe")
+		}
+	case "v2":
+		if !strings.Contains(string(stdioContents), "TestDaemonReconnectsToShimIOPipes writing to log") {
+			t.Fatal("containerd did not connect to the shim log pipe")
+		}
 	}
+}
 
-	if !strings.Contains(string(stdioContents), "TestDaemonReconnectsToShimIOPipes writing to stderr") {
-		t.Fatal("containerd did not connect to the shim stderr pipe")
+func writeToFile(t *testing.T, filePath, message string) {
+	writer, err := os.OpenFile(filePath, os.O_WRONLY, 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := writer.WriteString(message); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func getLogDirPath(runtimeVersion, testName string) string {
+	switch runtimeVersion {
+	case "v1":
+		return filepath.Join(defaultRoot, "io.containerd.runtime.v1.linux", testNamespace, testName)
+	case "v2":
+		return filepath.Join(defaultState, "io.containerd.runtime.v2.task", testNamespace, testName)
+	default:
+		panic(fmt.Errorf("Unsupported runtime version %s", runtimeVersion))
+	}
+}
+
+func getRuntimeVersion() string {
+	switch rt := os.Getenv("TEST_RUNTIME"); rt {
+	case "io.containerd.runc.v1":
+		return "v2"
+	default:
+		return "v1"
 	}
 }
 

@@ -27,10 +27,10 @@ import (
 
 // OpenShimStdoutLog opens the shim log for reading
 func OpenShimStdoutLog(ctx context.Context, logDirPath string) (io.ReadWriteCloser, error) {
-	return fifo.OpenFifo(ctx, filepath.Join(logDirPath, "stdout.log"), unix.O_RDWR|unix.O_CREAT|unix.O_NONBLOCK, 0700)
+	return fifo.OpenFifo(ctx, filepath.Join(logDirPath, "shim.stdout.log"), unix.O_RDWR|unix.O_CREAT|unix.O_NONBLOCK, 0700)
 }
 
 // OpenShimStderrLog opens the shim log
 func OpenShimStderrLog(ctx context.Context, logDirPath string) (io.ReadWriteCloser, error) {
-	return fifo.OpenFifo(ctx, filepath.Join(logDirPath, "stderr.log"), unix.O_RDWR|unix.O_CREAT|unix.O_NONBLOCK, 0700)
+	return fifo.OpenFifo(ctx, filepath.Join(logDirPath, "shim.stderr.log"), unix.O_RDWR|unix.O_CREAT|unix.O_NONBLOCK, 0700)
 }
