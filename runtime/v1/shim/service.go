@@ -643,5 +643,6 @@ func newInit(ctx context.Context, path, workDir, runtimeRoot, namespace, criu st
 	p.IoGID = int(options.IoGid)
 	p.NoPivotRoot = options.NoPivotRoot
 	p.NoNewKeyring = options.NoNewKeyring
+	p.NoRootfsMount = true
 	return p, nil
 }

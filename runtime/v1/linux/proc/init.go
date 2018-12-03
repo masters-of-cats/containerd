@@ -59,23 +59,24 @@ type Init struct {
 
 	WorkDir string
 
-	id           string
-	Bundle       string
-	console      console.Console
-	Platform     proc.Platform
-	io           runc.IO
-	runtime      *runc.Runc
-	status       int
-	exited       time.Time
-	pid          int
-	closers      []io.Closer
-	stdin        io.Closer
-	stdio        proc.Stdio
-	Rootfs       string
-	IoUID        int
-	IoGID        int
-	NoPivotRoot  bool
-	NoNewKeyring bool
+	id            string
+	Bundle        string
+	console       console.Console
+	Platform      proc.Platform
+	io            runc.IO
+	runtime       *runc.Runc
+	status        int
+	exited        time.Time
+	pid           int
+	closers       []io.Closer
+	stdin         io.Closer
+	stdio         proc.Stdio
+	Rootfs        string
+	IoUID         int
+	IoGID         int
+	NoPivotRoot   bool
+	NoNewKeyring  bool
+	NoRootfsMount bool
 }
 
 // NewRunc returns a new runc instance for a process
@@ -269,10 +270,12 @@ func (p *Init) delete(context context.Context) error {
 		}
 		p.io.Close()
 	}
-	if err2 := mount.UnmountAll(p.Rootfs, 0); err2 != nil {
-		log.G(context).WithError(err2).Warn("failed to cleanup rootfs mount")
-		if err == nil {
-			err = errors.Wrap(err2, "failed rootfs umount")
+	if !p.NoRootfsMount {
+		if err2 := mount.UnmountAll(p.Rootfs, 0); err2 != nil {
+			log.G(context).WithError(err2).Warn("failed to cleanup rootfs mount")
+			if err == nil {
+				err = errors.Wrap(err2, "failed rootfs umount")
+			}
 		}
 	}
 	return err

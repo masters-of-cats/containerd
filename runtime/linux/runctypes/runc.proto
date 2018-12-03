@@ -25,6 +25,7 @@ message CreateOptions {
 	string shim_cgroup = 9;
 	uint32 io_uid = 10;
 	uint32 io_gid = 11;
+	bool no_rootfs_mount = 12;
 }
 
 message CheckpointOptions {

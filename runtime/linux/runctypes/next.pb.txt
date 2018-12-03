@@ -112,6 +112,13 @@ file {
       type: TYPE_UINT32
       json_name: "ioGid"
     }
+    field {
+      name: "no_rootfs_mount"
+      number: 12
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "noRootfsMount"
+    }
   }
   message_type {
     name: "CheckpointOptions"
