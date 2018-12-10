@@ -20,6 +20,7 @@ package proc
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/containerd/console"
 	"github.com/pkg/errors"
@@ -156,7 +157,9 @@ func (s *execStoppedState) Start(ctx context.Context) error {
 }
 
 func (s *execStoppedState) Delete(ctx context.Context) error {
+	fmt.Println(">>>>>> About to delete exec stopped state")
 	if err := s.p.delete(ctx); err != nil {
+		fmt.Println(">>>>>> Delete failed", err.Error())
 		return err
 	}
 

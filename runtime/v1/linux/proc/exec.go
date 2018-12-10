@@ -118,6 +118,7 @@ func (e *execProcess) delete(ctx context.Context) error {
 		e.io.Close()
 	}
 	pidfile := filepath.Join(e.path, fmt.Sprintf("%s.pid", e.id))
+	fmt.Println(">>>>>>>>>>>>>", "Deleting execProcess pid file: ", pidfile)
 	// silently ignore error
 	os.Remove(pidfile)
 	return nil

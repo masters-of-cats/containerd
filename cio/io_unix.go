@@ -20,6 +20,7 @@ package cio
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -43,6 +44,7 @@ func NewFIFOSetInDir(root, id string, terminal bool) (*FIFOSet, error) {
 		return nil, err
 	}
 	closer := func() error {
+		fmt.Println(">>>>>>>>>>>>>>>>>>>>", "Deleting", dir)
 		return os.RemoveAll(dir)
 	}
 	return NewFIFOSet(Config{

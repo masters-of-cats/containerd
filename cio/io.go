@@ -136,7 +136,9 @@ func NewCreator(opts ...Opt) Creator {
 	if streams.FIFODir == "" {
 		streams.FIFODir = defaults.DefaultFIFODir
 	}
+	fmt.Println(">>>>>>>>>>>>>>>>>>>>", "FIFO Dir", streams.FIFODir)
 	return func(id string) (IO, error) {
+		fmt.Println(">>>>>>>>>>>>>>>>>>>>", fmt.Sprintf("Creator invoked with FIFO Dir %s and ID %s", streams.FIFODir, id))
 		fifos, err := NewFIFOSetInDir(streams.FIFODir, id, streams.Terminal)
 		if err != nil {
 			return nil, err

@@ -19,10 +19,12 @@ package containerd
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"syscall"
@@ -30,8 +32,10 @@ import (
 	"time"
 
 	// Register the typeurl
+
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/oci"
 	_ "github.com/containerd/containerd/runtime"
 	"github.com/containerd/typeurl"
@@ -316,6 +320,102 @@ func TestContainerExec(t *testing.T) {
 	}
 	<-finishedC
 }
+
+func TestContainerExecCleanupProcessState(t *testing.T) {
+	t.Parallel()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext()
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "100")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer task.Delete(ctx)
+
+	finishedC, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	bundleSpec, err := container.Spec(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	processSpec := bundleSpec.Process
+	processSpec.Args = []string{"echo", "hi"}
+
+	execID := t.Name() + "_exec"
+	process, err := task.Exec(ctx, execID, processSpec, cio.NewCreator(cio.WithStdio))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := process.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := process.CloseIO(ctx, WithStdinCloser); err != nil {
+		t.Fatal(err)
+	}
+
+	processStatusC, err := process.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// wait for the exec to return
+	status := <-processStatusC
+	if err := status.Error(); err != nil {
+		t.Fatal(err)
+	}
+	if status.ExitCode() != 0 {
+		t.Errorf("Process exited with exit code %d", status.ExitCode())
+	}
+
+	_, err = process.Delete(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Println(">>>>>>>>> Process ID: ", process.ID())
+	fifos, err := filepath.Glob(fmt.Sprintf("%s/*/%s-*", defaults.DefaultFIFODir, process.ID()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fifos) > 0 {
+		t.Errorf("Process fifos were not cleaned up, these remain: %v", fifos)
+	}
+
+	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+		t.Error(err)
+	}
+	<-finishedC
+}
+
 func TestContainerLargeExecArgs(t *testing.T) {
 	t.Parallel()
 
