@@ -20,6 +20,7 @@ import (
 	gocontext "context"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/urfave/cli"
 )
@@ -37,6 +38,7 @@ func AppContext(context *cli.Context) (gocontext.Context, gocontext.CancelFunc) 
 		cancel    gocontext.CancelFunc
 	)
 	ctx = namespaces.WithNamespace(ctx, namespace)
+	ctx = leases.WithLease(ctx, "lease-is-off")
 	if timeout > 0 {
 		ctx, cancel = gocontext.WithTimeout(ctx, timeout)
 	} else {
