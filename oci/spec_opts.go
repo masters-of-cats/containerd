@@ -363,6 +363,30 @@ func WithRootFSReadonly() SpecOpts {
 	}
 }
 
+// WithRootFSMount prepends the mounts array from the the snapshotter to the runtime mount array
+func WithRootFSMount(ctx context.Context, snapshotter, key string) SpecOpts {
+	return func(ctx context.Context, client Client, c *containers.Container, s *Spec) error {
+		mounts, err := client.SnapshotService(snapshotter).Mounts(ctx, key)
+		if err != nil {
+			return err
+		}
+
+		var rootfs []specs.Mount
+		for _, m := range mounts {
+			rootfs = append(rootfs, specs.Mount{
+				Type:        m.Type,
+				Source:      m.Source,
+				Destination: "/",
+				Options:     m.Options,
+			})
+		}
+
+		s.Mounts = append(rootfs, s.Mounts...)
+
+		return nil
+	}
+}
+
 // WithNoNewPrivileges sets no_new_privileges on the process for the container
 func WithNoNewPrivileges(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 	setProcess(s)

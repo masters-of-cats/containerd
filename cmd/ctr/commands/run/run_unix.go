@@ -101,6 +101,8 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 				// after creating some mount points on demand.
 				containerd.WithNewSnapshot(id, image),
 				containerd.WithImageStopSignal(image, "SIGTERM"))
+
+			opts = append(opts, oci.WithRootFSMount(ctx, snapshotter, id))
 		}
 		if context.Bool("readonly") {
 			opts = append(opts, oci.WithRootFSReadonly())

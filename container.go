@@ -195,28 +195,29 @@ func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...N
 		Stdout:      cfg.Stdout,
 		Stderr:      cfg.Stderr,
 	}
-	r, err := c.get(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if r.SnapshotKey != "" {
-		if r.Snapshotter == "" {
-			return nil, errors.Wrapf(errdefs.ErrInvalidArgument, "unable to resolve rootfs mounts without snapshotter on container")
-		}
-
-		// get the rootfs from the snapshotter and add it to the request
-		mounts, err := c.client.SnapshotService(r.Snapshotter).Mounts(ctx, r.SnapshotKey)
-		if err != nil {
-			return nil, err
-		}
-		for _, m := range mounts {
-			request.Rootfs = append(request.Rootfs, &types.Mount{
-				Type:    m.Type,
-				Source:  m.Source,
-				Options: m.Options,
-			})
-		}
-	}
+	// r, err := c.get(ctx)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// if r.SnapshotKey != "" {
+	// 	if r.Snapshotter == "" {
+	// 		return nil, errors.Wrapf(errdefs.ErrInvalidArgument, "unable to resolve rootfs mounts without snapshotter on container")
+	// 	}
+	//
+	// 	// get the rootfs from the snapshotter and add it to the request
+	// 	mounts, err := c.client.SnapshotService(r.Snapshotter).Mounts(ctx, r.SnapshotKey)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	// DINO: rootfs added here after snapshotter request
+	// 	for _, m := range mounts {
+	// 		request.Rootfs = append(request.Rootfs, &types.Mount{
+	// 			Type:    m.Type,
+	// 			Source:  m.Source,
+	// 			Options: m.Options,
+	// 		})
+	// 	}
+	// }
 	var info TaskInfo
 	for _, o := range opts {
 		if err := o(ctx, c.client, &info); err != nil {
@@ -247,6 +248,7 @@ func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...N
 	if info.Checkpoint != nil {
 		request.Checkpoint = info.Checkpoint
 	}
+	// DINO: task create
 	response, err := c.client.TaskService().Create(ctx, request)
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)

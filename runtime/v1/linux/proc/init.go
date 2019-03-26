@@ -32,7 +32,6 @@ import (
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/runtime/proc"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
@@ -156,6 +155,8 @@ func (p *Init) Create(ctx context.Context, r *CreateConfig) error {
 	if socket != nil {
 		opts.ConsoleSocket = socket
 	}
+
+	// DINO: call to runc here
 	if err := p.runtime.Create(ctx, r.ID, r.Bundle, opts); err != nil {
 		return p.runtimeError(err, "OCI runtime create failed")
 	}
@@ -298,12 +299,13 @@ func (p *Init) delete(ctx context.Context) error {
 		}
 		p.io.Close()
 	}
-	if err2 := mount.UnmountAll(p.Rootfs, 0); err2 != nil {
-		log.G(ctx).WithError(err2).Warn("failed to cleanup rootfs mount")
-		if err == nil {
-			err = errors.Wrap(err2, "failed rootfs umount")
-		}
-	}
+	// DINO: unmount rootfs here
+	// if err2 := mount.UnmountAll(p.Rootfs, 0); err2 != nil {
+	// 	log.G(ctx).WithError(err2).Warn("failed to cleanup rootfs mount")
+	// 	if err == nil {
+	// 		err = errors.Wrap(err2, "failed rootfs umount")
+	// 	}
+	// }
 	return err
 }
 

@@ -159,6 +159,7 @@ func (r *Runc) Create(context context.Context, id, bundle string, opts *CreateOp
 		}
 		return nil
 	}
+	// DINO: start runc here
 	ec, err := Monitor.Start(cmd)
 	if err != nil {
 		return err

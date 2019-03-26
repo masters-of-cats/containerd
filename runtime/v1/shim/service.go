@@ -33,7 +33,6 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
@@ -137,24 +136,25 @@ func (s *Service) Create(ctx context.Context, r *shimapi.CreateTaskRequest) (_ *
 		ParentCheckpoint: r.ParentCheckpoint,
 		Options:          r.Options,
 	}
-	rootfs := filepath.Join(r.Bundle, "rootfs")
-	defer func() {
-		if err != nil {
-			if err2 := mount.UnmountAll(rootfs, 0); err2 != nil {
-				log.G(ctx).WithError(err2).Warn("Failed to cleanup rootfs mount")
-			}
-		}
-	}()
-	for _, rm := range mounts {
-		m := &mount.Mount{
-			Type:    rm.Type,
-			Source:  rm.Source,
-			Options: rm.Options,
-		}
-		if err := m.Mount(rootfs); err != nil {
-			return nil, errors.Wrapf(err, "failed to mount rootfs component %v", m)
-		}
-	}
+	// rootfs := filepath.Join(r.Bundle, "rootfs")
+	// defer func() {
+	// 	if err != nil {
+	// 		if err2 := mount.UnmountAll(rootfs, 0); err2 != nil {
+	// 			log.G(ctx).WithError(err2).Warn("Failed to cleanup rootfs mount")
+	// 		}
+	// 	}
+	// }()
+	// for _, rm := range mounts {
+	// 	m := &mount.Mount{
+	// 		Type:    rm.Type,
+	// 		Source:  rm.Source,
+	// 		Options: rm.Options,
+	// 	}
+	// 	// 	// DINO: rootfs mounted here for whatever reason
+	// 	if err := m.Mount(rootfs); err != nil {
+	// 		return nil, errors.Wrapf(err, "failed to mount rootfs component %v", m)
+	// 	}
+	// }
 
 	s.mu.Lock()
 	defer s.mu.Unlock()

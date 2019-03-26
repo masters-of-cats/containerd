@@ -70,8 +70,8 @@ func TestTaskUpdate(t *testing.T) {
 		}
 		return nil
 	}
-	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image),
-		WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "30"), memory))
+	container, err := client.NewContainer(ctx, id, WithSnapshotter(DefaultSnapshotter), WithNewSnapshot(id, image),
+		WithNewSpec(oci.WithImageConfig(image), oci.WithRootFSMount(ctx, DefaultSnapshotter, id), withProcessArgs("sleep", "30"), memory))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +144,7 @@ func TestShimInCgroup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), oci.WithProcessArgs("sleep", "30")))
+	container, err := client.NewContainer(ctx, id, WithSnapshotter(DefaultSnapshotter), WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), oci.WithRootFSMount(ctx, DefaultSnapshotter, id), oci.WithProcessArgs("sleep", "30")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -207,7 +207,7 @@ func TestDaemonRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "30")))
+	container, err := client.NewContainer(ctx, id, WithSnapshotter(DefaultSnapshotter), WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), oci.WithRootFSMount(ctx, DefaultSnapshotter, id), withProcessArgs("sleep", "30")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -279,7 +279,7 @@ func TestContainerPTY(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), oci.WithTTY, withProcessArgs("echo", "hello")))
+	container, err := client.NewContainer(ctx, id, WithSnapshotter(DefaultSnapshotter), WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), oci.WithRootFSMount(ctx, DefaultSnapshotter, id), oci.WithTTY, withProcessArgs("echo", "hello")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -356,7 +356,7 @@ func TestContainerAttach(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withCat()))
+	container, err := client.NewContainer(ctx, id, WithSnapshotter(DefaultSnapshotter), WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), oci.WithRootFSMount(ctx, DefaultSnapshotter, id), withCat()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -517,8 +517,9 @@ func TestContainerUsername(t *testing.T) {
 
 	// squid user in the alpine image has a uid of 31
 	container, err := client.NewContainer(ctx, id,
+		WithSnapshotter(DefaultSnapshotter),
 		WithNewSnapshot(id, image),
-		WithNewSpec(oci.WithImageConfig(image), oci.WithUsername("squid"), oci.WithProcessArgs("id", "-u")),
+		WithNewSpec(oci.WithImageConfig(image), oci.WithRootFSMount(ctx, DefaultSnapshotter, id), oci.WithUsername("squid"), oci.WithProcessArgs("id", "-u")),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -591,8 +592,9 @@ func testContainerUser(t *testing.T, userstr, expectedOutput string) {
 	}()
 
 	container, err := client.NewContainer(ctx, id,
+		WithSnapshotter(DefaultSnapshotter),
 		WithNewSnapshot(id, image),
-		WithNewSpec(oci.WithImageConfig(image), oci.WithUser(userstr), oci.WithProcessArgs("sh", "-c", "echo $(id -u):$(id -g)")),
+		WithNewSpec(oci.WithImageConfig(image), oci.WithRootFSMount(ctx, DefaultSnapshotter, id), oci.WithUser(userstr), oci.WithProcessArgs("sh", "-c", "echo $(id -u):$(id -g)")),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -651,7 +653,7 @@ func TestContainerAttachProcess(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "100")))
+	container, err := client.NewContainer(ctx, id, WithSnapshotter(DefaultSnapshotter), WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), oci.WithRootFSMount(ctx, DefaultSnapshotter, id), withProcessArgs("sleep", "100")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -784,8 +786,9 @@ func TestContainerUserID(t *testing.T) {
 
 	// adm user in the alpine image has a uid of 3 and gid of 4.
 	container, err := client.NewContainer(ctx, id,
+		WithSnapshotter(DefaultSnapshotter),
 		WithNewSnapshot(id, image),
-		WithNewSpec(oci.WithImageConfig(image), oci.WithUserID(3), oci.WithProcessArgs("sh", "-c", "echo $(id -u):$(id -g)")),
+		WithNewSpec(oci.WithImageConfig(image), oci.WithRootFSMount(ctx, DefaultSnapshotter, id), oci.WithUserID(3), oci.WithProcessArgs("sh", "-c", "echo $(id -u):$(id -g)")),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -838,8 +841,10 @@ func TestContainerKillAll(t *testing.T) {
 	}
 
 	container, err := client.NewContainer(ctx, id,
+		WithSnapshotter(DefaultSnapshotter),
 		WithNewSnapshot(id, image),
 		WithNewSpec(oci.WithImageConfig(image),
+			oci.WithRootFSMount(ctx, DefaultSnapshotter, id),
 			withProcessArgs("sh", "-c", "top"),
 			oci.WithHostNamespace(specs.PIDNamespace),
 		),
@@ -893,7 +898,7 @@ func TestDaemonRestartWithRunningShim(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), oci.WithProcessArgs("sleep", "100")))
+	container, err := client.NewContainer(ctx, id, WithSnapshotter(DefaultSnapshotter), WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), oci.WithRootFSMount(ctx, DefaultSnapshotter, id), oci.WithProcessArgs("sleep", "100")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1060,9 +1065,11 @@ func initContainerAndCheckChildrenDieOnKill(t *testing.T, opts ...oci.SpecOpts) 
 	}
 
 	opts = append(opts, oci.WithImageConfig(image))
+	opts = append(opts, oci.WithRootFSMount(ctx, DefaultSnapshotter, id))
 	opts = append(opts, withProcessArgs("sh", "-c", "sleep 42; echo hi"))
 
 	container, err := client.NewContainer(ctx, id,
+		WithSnapshotter(DefaultSnapshotter),
 		WithNewSnapshot(id, image),
 		WithNewSpec(opts...),
 	)
@@ -1159,6 +1166,7 @@ func testUserNamespaces(t *testing.T, readonlyRootFS bool) {
 	}
 
 	opts := []NewContainerOpts{WithNewSpec(oci.WithImageConfig(image),
+		oci.WithRootFSMount(ctx, DefaultSnapshotter, id),
 		withExitStatus(7),
 		oci.WithUserNamespace(0, 1000, 10000),
 	)}
@@ -1246,7 +1254,7 @@ func TestTaskResize(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withExitStatus(7)))
+	container, err := client.NewContainer(ctx, id, WithSnapshotter(DefaultSnapshotter), WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), oci.WithRootFSMount(ctx, DefaultSnapshotter, id), withExitStatus(7)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1386,8 +1394,9 @@ func TestBindLowPortNonRoot(t *testing.T) {
 		t.Fatal(err)
 	}
 	container, err := client.NewContainer(ctx, id,
+		WithSnapshotter(DefaultSnapshotter),
 		WithNewSnapshot(id, image),
-		WithNewSpec(oci.WithImageConfig(image), withProcessArgs("nc", "-l", "-p", "80"), oci.WithUIDGID(1000, 1000)),
+		WithNewSpec(oci.WithImageConfig(image), oci.WithRootFSMount(ctx, DefaultSnapshotter, id), withProcessArgs("nc", "-l", "-p", "80"), oci.WithUIDGID(1000, 1000)),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1442,8 +1451,9 @@ func TestBindLowPortNonOpt(t *testing.T) {
 		t.Fatal(err)
 	}
 	container, err := client.NewContainer(ctx, id,
+		WithSnapshotter(DefaultSnapshotter),
 		WithNewSnapshot(id, image),
-		WithNewSpec(oci.WithImageConfig(image), withProcessArgs("nc", "-l", "-p", "80"), oci.WithUIDGID(1000, 1000), oci.WithAmbientCapabilities([]string{"CAP_NET_BIND_SERVICE"})),
+		WithNewSpec(oci.WithImageConfig(image), oci.WithRootFSMount(ctx, DefaultSnapshotter, id), withProcessArgs("nc", "-l", "-p", "80"), oci.WithUIDGID(1000, 1000), oci.WithAmbientCapabilities([]string{"CAP_NET_BIND_SERVICE"})),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1502,7 +1512,7 @@ func TestContainerNoSTDIN(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withExitStatus(0)))
+	container, err := client.NewContainer(ctx, id, WithSnapshotter(DefaultSnapshotter), WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), oci.WithRootFSMount(ctx, DefaultSnapshotter, id), withExitStatus(0)))
 	if err != nil {
 		t.Fatal(err)
 	}

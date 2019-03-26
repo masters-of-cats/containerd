@@ -164,10 +164,11 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 		return nil, err
 	}
 
+	// DINO: write bundle config.json here
 	bundle, err := newBundle(id,
 		filepath.Join(r.state, namespace),
 		filepath.Join(r.root, namespace),
-		opts.Spec.Value)
+		opts.Spec.Value) // add rootfs mount opts spec here
 	if err != nil {
 		return nil, err
 	}
@@ -244,6 +245,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 			Options: m.Options,
 		})
 	}
+	// DINO: call to shim service
 	cr, err := s.Create(ctx, sopts)
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)
