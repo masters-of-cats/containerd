@@ -1675,6 +1675,110 @@ func TestContainerExecLargeOutputWithTTY(t *testing.T) {
 	<-finishedC
 }
 
+func TestContainerExecLargeOutputWithProcessWithTTYAndStdinClose(t *testing.T) {
+	t.Parallel()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext(t)
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "999")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer task.Delete(ctx)
+
+	finishedC, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := task.CloseIO(ctx, WithStdinCloser); err != nil {
+		t.Fatal(err)
+	}
+
+	spec, err := container.Spec(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < 100; i++ {
+		// start an exec process without running the original container process info
+		processSpec := spec.Process
+		withExecArgs(processSpec, "sh", "-c", `seq -s " " 1000000`)
+
+		stdout := bytes.NewBuffer(nil)
+
+		execID := t.Name() + "_exec"
+		process, err := task.Exec(ctx, execID, processSpec, cio.NewCreator(withByteBuffers(stdout), withProcessTTY()))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		processStatusC, err := process.Wait(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := process.Start(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := process.CloseIO(ctx, WithStdinCloser); err != nil {
+			t.Fatal(err)
+		}
+
+		// wait for the exec to return
+		status := <-processStatusC
+		code, _, err := status.Result()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if code != 0 {
+			t.Errorf("expected exec exit code 0 but received %d", code)
+		}
+		if _, err := process.Delete(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		const expectedSuffix = "999999 1000000"
+		stdoutString := stdout.String()
+		if !strings.Contains(stdoutString, expectedSuffix) {
+			t.Fatalf("process output does not end with %q on iteration %d, here are the last 20 characters of the output:\n\n %q", expectedSuffix, i, stdoutString[len(stdoutString)-20:])
+		}
+	}
+
+	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+		t.Error(err)
+	}
+	<-finishedC
+}
+
 func TestShortRunningTaskPid(t *testing.T) {
 	t.Parallel()
 
