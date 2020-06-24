@@ -28,6 +28,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -1899,3 +1900,125 @@ func TestShimOOMScore(t *testing.T) {
 
 	<-statusC
 }
+
+func TestContainerProcessWithTTYDoesNotLeakPipes(t *testing.T) {
+	t.Parallel()
+
+	if runtime.GOOS == "windows" {
+		// On windows, closing the write side of the pipe closes the read
+		// side, sending an EOF to it and preventing reopening it.
+		// Hence this test will always fails on windows
+		t.Skip("invalid logic on windows")
+	}
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext(t)
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "100")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer task.Delete(ctx)
+
+	status, err := task.Wait(ctx)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	spec, err := container.Spec(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	processSpec := spec.Process
+	processSpec.Args = []string{"cat"}
+
+	execID := t.Name() + "_exec"
+	ioFifoDir, err := ioutil.TempDir("", "io-"+execID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(ioFifoDir)
+
+	ioOpts := func(opt *cio.Streams) {
+		cio.WithFIFODir(ioFifoDir)(opt)
+		cio.WithTerminal(opt)
+		cio.WithStreams(bytes.NewBufferString(""), bytes.NewBufferString(""), bytes.NewBufferString(""))(opt)
+	}
+	process, err := task.Exec(ctx, execID, processSpec, cio.NewCreator(ioOpts))
+	if err != nil {
+		t.Fatal(err)
+	}
+	processStatusC, err := process.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := process.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := process.CloseIO(ctx, WithStdinCloser); err != nil {
+		t.Error(err)
+	}
+
+	<-processStatusC
+
+	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+		t.Error(err)
+	}
+
+	<-status
+
+	processPipes, err := getPipesForCurrentProcessAndExecution(execID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(processPipes) > 0 {
+		t.Errorf("The following pipes are not closed after the process completed:\n\n %s", processPipes)
+	}
+}
+
+func getPipesForCurrentProcessAndExecution(execID string) ([]string, error) {
+	cmd := exec.Command("sh", "-c", fmt.Sprintf("lsof -p %d", os.Getpid()))
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, err
+	}
+
+	result := []string{}
+	for _, line := range strings.Split(string(output), "\n") {
+		if strings.Contains(line, strconv.Itoa(os.Getpid())) && strings.Contains(line, execID) {
+			result = append(result, line)
+		}
+	}
+
+	return result, nil
+}
+
